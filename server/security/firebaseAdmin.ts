@@ -164,8 +164,12 @@ export async function verifyFirebaseIdToken(
 
   const app = getFirebaseAdminApp();
   const auth = getAuth(app);
+  // Production must always consult Firebase's revocation state. The
+  // environment override remains available for emulator/local development.
   const shouldCheckRevoked =
-    options?.checkRevoked ?? process.env.FIREBASE_CHECK_REVOKED !== 'false';
+    process.env.NODE_ENV === 'production'
+      ? true
+      : options?.checkRevoked ?? process.env.FIREBASE_CHECK_REVOKED !== 'false';
 
   let decoded: DecodedIdToken;
   try {
