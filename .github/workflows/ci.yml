@@ -32,6 +32,12 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Install integration-test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          npm install --global firebase-tools
+
       - name: Typecheck
         run: npm run lint
 
