@@ -1,0 +1,285 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid && request.auth.token.email_verified == true;
+    }
+
+    function isValidPreferences(prefs) {
+      return prefs is map
+        && prefs.keys().hasAll([
+          'defaultQuality',
+          'defaultFormat',
+          'autoDetectClipboard',
+          'saveHistoryLocally',
+          'workspaceName'
+        ])
+        && prefs.keys().hasOnly([
+          'defaultQuality',
+          'defaultFormat',
+          'autoDetectClipboard',
+          'saveHistoryLocally',
+          'autoRetry',
+          'workspaceName'
+        ])
+        && prefs.defaultQuality is string
+        && prefs.defaultQuality in ['best', 'standard', 'audio']
+        && prefs.defaultFormat is string
+        && prefs.defaultFormat in ['mp4', 'webm', 'mp3', 'm4a']
+        && prefs.autoDetectClipboard is bool
+        && prefs.saveHistoryLocally is bool
+        && (!('autoRetry' in prefs) || prefs.autoRetry is bool)
+        && prefs.workspaceName is string
+        && prefs.workspaceName.size() >= 1
+        && prefs.workspaceName.size() <= 60;
+    }
+
+    function isValidUserProfile(data, uid) {
+      return data is map
+        && data.keys().hasAll([
+          'uid',
+          'displayName',
+          'email',
+          'photoURL',
+          'preferences',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'email',
+          'photoURL',
+          'preferences',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.uid is string
+        && data.uid == uid
+        && data.uid == request.auth.uid
+        && data.uid.size() >= 1
+        && data.uid.size() <= 128
+        && data.displayName is string
+        && data.displayName.size() >= 1
+        && data.displayName.size() <= 80
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 254
+        && (request.auth.token.email == null || data.email == request.auth.token.email)
+        && data.photoURL is string
+        && data.photoURL.size() <= 1024
+        && isValidPreferences(data.preferences)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDownloadRecord(data, uid) {
+      return data is map
+        && data.keys().hasAll([
+          'ownerUid',
+          'url',
+          'platform',
+          'platformName',
+          'mediaType',
+          'format',
+          'qualityPreference',
+          'status',
+          'fileSize',
+          'resourceId',
+          'note',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerUid',
+          'url',
+          'platform',
+          'platformName',
+          'mediaType',
+          'format',
+          'qualityPreference',
+          'status',
+          'fileSize',
+          'resourceId',
+          'note',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.ownerUid is string
+        && data.ownerUid == uid
+        && data.ownerUid == request.auth.uid
+        && data.ownerUid.size() <= 128
+        && data.url is string
+        && data.url.size() >= 10
+        && data.url.size() <= 2048
+        && data.platform is string
+        && data.platform in ['youtube', 'instagram', 'tiktok', 'facebook', 'x', 'direct', 'unsupported']
+        && data.platformName is string
+        && data.platformName.size() >= 1
+        && data.platformName.size() <= 60
+        && data.mediaType is string
+        && data.mediaType.size() >= 1
+        && data.mediaType.size() <= 40
+        && data.format is string
+        && data.format.size() >= 1
+        && data.format.size() <= 32
+        && data.qualityPreference is string
+        && data.qualityPreference.size() >= 1
+        && data.qualityPreference.size() <= 60
+        && data.status is string
+        && data.status in ['analyzed', 'queued', 'processing', 'verifying', 'completed', 'failed', 'permanently_failed', 'cancelled', 'unsupported']
+        && data.fileSize is number
+        && data.fileSize >= 0
+        && data.fileSize <= 524288000
+        && data.resourceId is string
+        && data.resourceId.size() <= 256
+        && data.note is string
+        && data.note.size() <= 500
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidActivityRecord(data, uid) {
+      return data is map
+        && data.keys().hasAll(['ownerUid', 'action', 'timestamp', 'metadata'])
+        && data.keys().hasOnly(['ownerUid', 'action', 'timestamp', 'metadata'])
+        && data.ownerUid is string
+        && data.ownerUid == uid
+        && data.ownerUid == request.auth.uid
+        && data.ownerUid.size() <= 128
+        && data.action is string
+        && data.action in [
+          'auth_login',
+          'auth_register',
+          'auth_logout',
+          'url_analyzed',
+          'download_started',
+          'download_completed',
+          'download_failed',
+          'download_cancelled',
+          'preferences_updated',
+          'history_cleared'
+        ]
+        && data.timestamp is timestamp
+        && data.metadata is map
+        && data.metadata.keys().size() <= 10;
+    }
+
+    match /users/{uid} {
+      // Strictly owner-only read for PII isolation; never allow listing all users
+      allow get: if isValidId(uid) && isSignedIn() && request.auth.uid == uid;
+      allow list: if false;
+
+      allow create: if isValidId(uid)
+        && isVerifiedOwner(uid)
+        && isValidUserProfile(incoming(), uid)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidId(uid)
+        && isVerifiedOwner(uid)
+        && isValidUserProfile(incoming(), uid)
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['preferences', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'preferences', 'updatedAt'])
+        );
+
+      allow delete: if isValidId(uid) && isVerifiedOwner(uid);
+
+      match /downloads/{downloadId} {
+        allow get: if isValidId(uid)
+          && isValidId(downloadId)
+          && isVerifiedOwner(uid)
+          && existing().ownerUid == request.auth.uid;
+
+        allow list: if isVerifiedOwner(uid)
+          && resource.data.ownerUid == request.auth.uid;
+
+        allow create: if isValidId(uid)
+          && isValidId(downloadId)
+          && isVerifiedOwner(uid)
+          && existsAfter(/databases/$(database)/documents/users/$(uid))
+          && getAfter(/databases/$(database)/documents/users/$(uid)).data.uid == request.auth.uid
+          && isValidDownloadRecord(incoming(), uid)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+
+        // Terminal states cannot be altered by clients
+        allow update: if isValidId(uid)
+          && isValidId(downloadId)
+          && isVerifiedOwner(uid)
+          && isValidDownloadRecord(incoming(), uid)
+          && !(existing().status in ['completed', 'failed', 'permanently_failed', 'cancelled'])
+          && incoming().ownerUid == existing().ownerUid
+          && incoming().url == existing().url
+          && incoming().platform == existing().platform
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'status',
+            'format',
+            'fileSize',
+            'note',
+            'updatedAt'
+          ]);
+
+        allow delete: if isValidId(uid)
+          && isValidId(downloadId)
+          && isVerifiedOwner(uid)
+          && existing().ownerUid == request.auth.uid;
+      }
+
+      match /activity/{activityId} {
+        allow get: if isValidId(uid)
+          && isValidId(activityId)
+          && isVerifiedOwner(uid)
+          && existing().ownerUid == request.auth.uid;
+
+        allow list: if isVerifiedOwner(uid)
+          && resource.data.ownerUid == request.auth.uid;
+
+        allow create: if isValidId(uid)
+          && isValidId(activityId)
+          && isVerifiedOwner(uid)
+          && existsAfter(/databases/$(database)/documents/users/$(uid))
+          && getAfter(/databases/$(database)/documents/users/$(uid)).data.uid == request.auth.uid
+          && isValidActivityRecord(incoming(), uid)
+          && incoming().timestamp == request.time;
+
+        allow update: if false;
+
+        allow delete: if isValidId(uid)
+          && isValidId(activityId)
+          && isVerifiedOwner(uid)
+          && existing().ownerUid == request.auth.uid;
+      }
+    }
+  }
+}

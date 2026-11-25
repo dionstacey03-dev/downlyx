@@ -1,0 +1,248 @@
+{
+  "entities": {
+    "UserPreferences": {
+      "title": "UserPreferences",
+      "description": "User workspace preferences synchronized across devices.",
+      "type": "object",
+      "properties": {
+        "defaultQuality": {
+          "type": "string",
+          "enum": ["best", "standard", "audio"],
+          "description": "Default quality selection preference."
+        },
+        "defaultFormat": {
+          "type": "string",
+          "enum": ["mp4", "webm", "mp3", "m4a"],
+          "description": "Preferred target format."
+        },
+        "autoDetectClipboard": {
+          "type": "boolean",
+          "description": "Whether clipboard HTTPS URLs are auto-detected on focus."
+        },
+        "saveHistoryLocally": {
+          "type": "boolean",
+          "description": "Whether queue history is cached in browser storage."
+        },
+        "autoRetry": {
+          "type": "boolean",
+          "description": "Whether failed downloads automatically retry up to 3 times before permanently failing."
+        },
+        "workspaceName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "description": "Display label for the user's workspace."
+        }
+      },
+      "required": [
+        "defaultQuality",
+        "defaultFormat",
+        "autoDetectClipboard",
+        "saveHistoryLocally",
+        "workspaceName"
+      ]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private user account profile and synced workspace settings stored at users/{uid}.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Immutable Firebase Auth UID matching document path."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "User display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 254,
+          "description": "Primary verified email address."
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 1024,
+          "description": "Optional profile avatar URL."
+        },
+        "preferences": {
+          "type": "object",
+          "$ref": "#/entities/UserPreferences",
+          "description": "User download and UI preferences."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when profile was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when profile was last updated."
+        }
+      },
+      "required": [
+        "uid",
+        "displayName",
+        "email",
+        "photoURL",
+        "preferences",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UserDownloadRecord": {
+      "title": "UserDownloadRecord",
+      "description": "Persistent media analysis or download metadata record (no binary media stored in Firestore).",
+      "type": "object",
+      "properties": {
+        "ownerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Authenticated Firebase UID owning this download record."
+        },
+        "url": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 2048,
+          "description": "Normalized HTTPS source URL."
+        },
+        "platform": {
+          "type": "string",
+          "enum": ["youtube", "instagram", "tiktok", "facebook", "x", "direct", "unsupported"],
+          "description": "Detected source platform identifier."
+        },
+        "platformName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "description": "Human-readable platform label."
+        },
+        "mediaType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "description": "Detected media category."
+        },
+        "format": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "description": "Target or verified media container format."
+        },
+        "qualityPreference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "description": "Applied quality preference label."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["analyzed", "queued", "processing", "verifying", "completed", "failed", "permanently_failed", "cancelled", "unsupported"],
+          "description": "Lifecycle status of the media record."
+        },
+        "fileSize": {
+          "type": "number",
+          "description": "Verified file size in bytes (0 when not downloaded)."
+        },
+        "resourceId": {
+          "type": "string",
+          "maxLength": 256,
+          "description": "Platform resource identifier or empty string."
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Status summary or validation note."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of record creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last status update."
+        }
+      },
+      "required": [
+        "ownerUid",
+        "url",
+        "platform",
+        "platformName",
+        "mediaType",
+        "format",
+        "qualityPreference",
+        "status",
+        "fileSize",
+        "resourceId",
+        "note",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UserActivityRecord": {
+      "title": "UserActivityRecord",
+      "description": "Immutable user workspace activity audit entry.",
+      "type": "object",
+      "properties": {
+        "ownerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Authenticated Firebase UID owning this activity record."
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "auth_login",
+            "auth_register",
+            "auth_logout",
+            "url_analyzed",
+            "download_started",
+            "download_completed",
+            "download_failed",
+            "download_cancelled",
+            "preferences_updated",
+            "history_cleared"
+          ],
+          "description": "Categorized workspace or authentication action."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the activity occurred."
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Bounded map of non-sensitive event metadata."
+        }
+      },
+      "required": ["ownerUid", "action", "timestamp", "metadata"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Owner-only user profile and workspace preferences document."
+    },
+    "/users/{uid}/downloads/{downloadId}": {
+      "schema": { "$ref": "#/entities/UserDownloadRecord" },
+      "description": "Owner-only persistent download and analysis history records."
+    },
+    "/users/{uid}/activity/{activityId}": {
+      "schema": { "$ref": "#/entities/UserActivityRecord" },
+      "description": "Owner-only append-only activity log records."
+    }
+  }
+}

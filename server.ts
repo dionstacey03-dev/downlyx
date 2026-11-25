@@ -1,0 +1,76 @@
+import 'dotenv/config';
+import express from 'express';
+import type { NextFunction, Request, Response } from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { mediaRouter } from './server/routes/media.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+async function createServer() {
+  const app = express();
+  const port = Number(process.env.PORT) || 3000;
+  const isProd = process.env.NODE_ENV === 'production';
+
+  app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : false);
+  app.use((_req, res, next) => {
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    next();
+  });
+  app.use(express.json({ limit: '16kb' }));
+
+  // Consistent JSON error response for oversized or malformed JSON bodies
+  app.use((err: Error & { status?: number; type?: string }, _req: Request, res: Response, next: NextFunction) => {
+    if (err?.type === 'entity.too.large') {
+      res.status(413).json({
+        success: false,
+        validationStatus: 'blocked',
+        error: 'Request payload exceeds the 16KB size limit.',
+        warnings: ['Request size limit enforced.'],
+      });
+      return;
+    }
+    if (err instanceof SyntaxError && err.status === 400) {
+      res.status(400).json({
+        success: false,
+        validationStatus: 'invalid',
+        error: 'Malformed JSON request body.',
+        warnings: [],
+      });
+      return;
+    }
+    next(err);
+  });
+
+  app.use('/api', mediaRouter);
+
+  if (!isProd) {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: {
+        middlewareMode: true,
+        hmr: process.env.DISABLE_HMR !== 'true',
+      },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distDir = path.resolve(__dirname, 'dist');
+    app.use(express.static(distDir));
+    app.get('/{*splat}', (_req, res) => {
+      res.sendFile(path.join(distDir, 'index.html'));
+    });
+  }
+
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`DOWNLYX server listening on http://0.0.0.0:${port}`);
+  });
+}
+
+createServer().catch((err) => {
+  console.error('Failed to start DOWNLYX server:', err);
+  process.exit(1);
+});

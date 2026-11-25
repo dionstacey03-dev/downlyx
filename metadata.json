@@ -1,0 +1,6 @@
+{
+  "name": "DOWNLYX",
+  "description": "Multi-platform media management, URL validation, and download queue workspace.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

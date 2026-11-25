@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  downlyx-api:
+    build:
+      context: ..
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      TRUST_PROXY: "true"
+      DOWNLYX_SESSION_SECRET: "${DOWNLYX_SESSION_SECRET}"
+    networks:
+      - downlyx-app-net
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  downlyx-media-worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.worker
+    user: "1000:1000"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    cpus: "1.0"
+    mem_limit: 512m
+    pids_limit: 64
+    tmpfs:
+      - /tmp/downlyx-media-tmp:rw,noexec,nosuid,nodev,size=256m,mode=0700
+    environment:
+      DOWNLYX_WORKER_MODE: "1"
+      NODE_ENV: production
+    # Worker MUST attach only to dedicated egress-filtered network (never internal DB/VPC nets)
+    networks:
+      - downlyx-worker-egress
+
+networks:
+  downlyx-app-net:
+    driver: bridge
+  downlyx-worker-egress:
+    driver: bridge
+    driver_opts:
+      # Pair with iptables/nftables egress policy denying RFC1918 & 169.254.0.0/16
+      com.docker.network.bridge.enable_icc: "false"
