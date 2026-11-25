@@ -173,10 +173,11 @@ export async function verifyFirebaseIdToken(
   } catch (err) {
     if (
       shouldCheckRevoked &&
+      process.env.NODE_ENV !== 'production' &&
       process.env.FIREBASE_STRICT_ADMIN_REVOCATION !== 'true' &&
       isIamUnavailableError(err)
     ) {
-      // Fallback to cryptographic signature + expiry verification when IAM accounts:lookup is unavailable (e.g., Starter Tier preview)
+      // Non-production fallback only: production must fail closed when revocation cannot be checked.
       try {
         decoded = await auth.verifyIdToken(trimmed, false);
       } catch (innerErr) {
