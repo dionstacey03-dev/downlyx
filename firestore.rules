@@ -161,6 +161,24 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function isValidActivityMetadata(meta) {
+      return meta is map
+        && meta.keys().hasOnly(['platform', 'format', 'fileSize', 'status'])
+        && meta.keys().size() <= 4
+        && (!('platform' in meta)
+          || (meta.platform is string
+            && meta.platform in ['youtube', 'instagram', 'tiktok', 'facebook', 'x', 'direct', 'unsupported']))
+        && (!('format' in meta)
+          || (meta.format is string && meta.format.size() <= 32))
+        && (!('fileSize' in meta)
+          || (meta.fileSize is number
+            && meta.fileSize >= 0
+            && meta.fileSize <= 524288000))
+        && (!('status' in meta)
+          || (meta.status is string
+            && meta.status in ['analyzed', 'queued', 'processing', 'verifying', 'completed', 'failed', 'permanently_failed', 'cancelled', 'unsupported']));
+    }
+
     function isValidActivityRecord(data, uid) {
       return data is map
         && data.keys().hasAll(['ownerUid', 'action', 'timestamp', 'metadata'])
@@ -183,8 +201,7 @@ service cloud.firestore {
           'history_cleared'
         ]
         && data.timestamp is timestamp
-        && data.metadata is map
-        && data.metadata.keys().size() <= 10;
+        && isValidActivityMetadata(data.metadata);
     }
 
     match /users/{uid} {
