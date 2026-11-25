@@ -4,11 +4,14 @@ import type { NextFunction, Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { mediaRouter } from './server/routes/media.ts';
+import { assertSessionSecretConfigured } from './server/security/sessionAuth.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function createServer() {
+  // Validate security-critical configuration before opening the listener.
+  assertSessionSecretConfigured();
   const app = express();
   const port = Number(process.env.PORT) || 3000;
   const isProd = process.env.NODE_ENV === 'production';
