@@ -16,6 +16,12 @@ const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfigJson.apiKey,
 };
 
+if (!firebaseConfig.apiKey?.trim()) {
+  throw new Error(
+    'Missing Firebase client API key. Set VITE_FIREBASE_API_KEY in your local or deployment environment.'
+  );
+}
+
 const app = initializeApp(firebaseConfig);
 
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
