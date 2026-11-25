@@ -3,12 +3,25 @@ import type { NextFunction, Request, Response } from 'express';
 
 const EPHEMERAL_SECRET = crypto.randomBytes(32).toString('hex');
 
+/**
+ * Fail closed in production if a stable signing key is not configured.
+ * A process-random key invalidates signed links on restart and, more
+ * importantly, makes tokens issued by one replica unverifiable by another.
+ */
+export function assertSessionSecretConfigured(): void {
+  const configured = process.env.DOWNLYX_SESSION_SECRET?.trim();
+  if (process.env.NODE_ENV === 'production' && (!configured || Buffer.byteLength(configured, 'utf8') < 32)) {
+    throw new Error('DOWNLYX_SESSION_SECRET must be configured with at least 32 bytes in production.');
+  }
+}
+
 // Single-use nonce registry prevents replay of consumed download tokens
 const consumedDownloadNonces = new Map<string, number>();
 const MAX_NONCE_CACHE = 10_000;
 
 function getSigningSecret(): string {
-  return process.env.DOWNLYX_SESSION_SECRET || EPHEMERAL_SECRET;
+  assertSessionSecretConfigured();
+  return process.env.DOWNLYX_SESSION_SECRET?.trim() || EPHEMERAL_SECRET;
 }
 
 function signPayload(payloadB64: string): string {
@@ -79,7 +92,14 @@ export function verifyWorkspaceSessionToken(
     if (
       !parsed ||
       typeof parsed.ownerId !== 'string' ||
-      typeof parsed.expiresAt !== 'number'
+      parsed.ownerId.length < 1 ||
+      parsed.ownerId.length > 128 ||
+      typeof parsed.issuedAt !== 'number' ||
+      !Number.isFinite(parsed.issuedAt) ||
+      typeof parsed.expiresAt !== 'number' ||
+      !Number.isFinite(parsed.expiresAt) ||
+      parsed.expiresAt <= parsed.issuedAt ||
+      parsed.expiresAt - parsed.issuedAt > 24 * 60 * 60 * 1000
     ) {
       return null;
     }
