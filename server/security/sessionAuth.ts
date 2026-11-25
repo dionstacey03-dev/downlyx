@@ -44,11 +44,7 @@ function pruneExpiredNonces(now = Date.now()) {
       consumedDownloadNonces.delete(jti);
     }
   }
-  while (consumedDownloadNonces.size > MAX_NONCE_CACHE) {
-    const oldest = consumedDownloadNonces.keys().next().value;
-    if (oldest === undefined) break;
-    consumedDownloadNonces.delete(oldest);
-  }
+  // Do not evict unexpired consumed IDs: eviction would re-enable replay.
 }
 
 export interface WorkspaceSessionPayload {
@@ -61,6 +57,12 @@ export function issueWorkspaceSessionToken(
   ownerId = crypto.randomUUID(),
   ttlMs = 24 * 60 * 60 * 1000
 ): { token: string; ownerId: string; expiresAt: string } {
+  if (typeof ownerId !== 'string' || ownerId.trim().length < 1 || ownerId.length > 128) {
+    throw new Error('Workspace session ownerId must be a non-empty string of at most 128 characters.');
+  }
+  if (!Number.isFinite(ttlMs) || ttlMs <= 0 || ttlMs > 24 * 60 * 60 * 1000) {
+    throw new Error('Workspace session TTL must be between 1ms and 24 hours.');
+  }
   const now = Date.now();
   const payload: WorkspaceSessionPayload = {
     ownerId,
@@ -79,6 +81,7 @@ export function issueWorkspaceSessionToken(
 export function verifyWorkspaceSessionToken(
   token: string
 ): WorkspaceSessionPayload | null {
+  if (typeof token !== 'string' || token.length > 4096) return null;
   const parts = token.split('.');
   if (parts.length !== 2) return null;
   const [payloadB64, sig] = parts;
@@ -99,7 +102,8 @@ export function verifyWorkspaceSessionToken(
       typeof parsed.expiresAt !== 'number' ||
       !Number.isFinite(parsed.expiresAt) ||
       parsed.expiresAt <= parsed.issuedAt ||
-      parsed.expiresAt - parsed.issuedAt > 24 * 60 * 60 * 1000
+      parsed.expiresAt - parsed.issuedAt > 24 * 60 * 60 * 1000 ||
+      parsed.issuedAt > Date.now() + 60_000
     ) {
       return null;
     }
@@ -126,7 +130,14 @@ export function createSignedDownloadToken(params: {
   fileId: string;
   ttlMs?: number;
 }): { token: string; expiresAt: string } {
-  const expiresAt = Date.now() + (params.ttlMs ?? 5 * 60 * 1000);
+  const ttlMs = params.ttlMs ?? 5 * 60 * 1000;
+  if (!params.jobId || params.jobId.length > 128 || !params.ownerId || params.ownerId.length > 128 || !params.fileId || params.fileId.length > 256) {
+    throw new Error('Download token identifiers are missing or exceed their allowed length.');
+  }
+  if (!Number.isFinite(ttlMs) || ttlMs <= 0 || ttlMs > 15 * 60 * 1000) {
+    throw new Error('Download token TTL must be between 1ms and 15 minutes.');
+  }
+  const expiresAt = Date.now() + ttlMs;
   const payload: DownloadAccessPayload = {
     jti: crypto.randomBytes(16).toString('hex'),
     jobId: params.jobId,
@@ -147,6 +158,7 @@ export function verifySignedDownloadToken(
   expectedJobId: string,
   options?: { consume?: boolean }
 ): DownloadAccessPayload | null {
+  if (typeof token !== 'string' || token.length > 4096) return null;
   const parts = token.split('.');
   if (parts.length !== 2) return null;
   const [payloadB64, sig] = parts;
@@ -160,16 +172,21 @@ export function verifySignedDownloadToken(
     if (
       !parsed ||
       typeof parsed.jti !== 'string' ||
-      parsed.jti.length < 16 ||
+      !/^[a-f0-9]{32}$/i.test(parsed.jti) ||
       parsed.jobId !== expectedJobId ||
       typeof parsed.ownerId !== 'string' ||
+      parsed.ownerId.length < 1 ||
+      parsed.ownerId.length > 128 ||
       typeof parsed.fileId !== 'string' ||
-      typeof parsed.expiresAt !== 'number'
+      parsed.fileId.length < 1 ||
+      parsed.fileId.length > 256 ||
+      typeof parsed.expiresAt !== 'number' ||
+      !Number.isFinite(parsed.expiresAt)
     ) {
       return null;
     }
     const now = Date.now();
-    if (now > parsed.expiresAt) {
+    if (now > parsed.expiresAt || parsed.expiresAt - now > 15 * 60 * 1000) {
       return null;
     }
 
@@ -179,6 +196,10 @@ export function verifySignedDownloadToken(
     }
 
     if (options?.consume !== false) {
+      if (consumedDownloadNonces.size >= MAX_NONCE_CACHE) {
+        // Fail closed rather than evict an unexpired nonce and permit replay.
+        return null;
+      }
       consumedDownloadNonces.set(parsed.jti, parsed.expiresAt);
     }
 
