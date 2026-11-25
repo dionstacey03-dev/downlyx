@@ -598,8 +598,22 @@ export function createRateLimiter(options: {
 
     if (!existing || now >= existing.resetAt) {
       if (buckets.size >= MAX_RATE_LIMIT_BUCKETS) {
-        const firstKey = buckets.keys().next().value;
-        if (firstKey !== undefined) buckets.delete(firstKey);
+        // Expired buckets may be reclaimed, but never evict a live client's
+        // bucket: doing so lets an attacker rotate spoofed IPs to reset limits.
+        for (const [key, bucket] of buckets) {
+          if (now >= bucket.resetAt) buckets.delete(key);
+        }
+      }
+      if (buckets.size >= MAX_RATE_LIMIT_BUCKETS) {
+        res.setHeader('X-RateLimit-Limit', String(options.maxRequests));
+        res.setHeader('X-RateLimit-Remaining', '0');
+        res.setHeader('Retry-After', String(Math.max(1, Math.ceil(options.windowMs / 1000))));
+        res.status(429).json({
+          success: false,
+          validationStatus: 'blocked',
+          error: 'Rate limiter capacity reached. Retry after the current rate-limit window.',
+        });
+        return;
       }
       const fresh: RateBucket = {
         count: 1,
