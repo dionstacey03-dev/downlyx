@@ -588,8 +588,13 @@ export function createRateLimiter(options: {
   windowMs: number;
   maxRequests: number;
   trustProxy?: boolean;
+  maxBuckets?: number;
 }) {
   const buckets = new Map<string, RateBucket>();
+  const maxBuckets = Math.min(
+    MAX_RATE_LIMIT_BUCKETS,
+    Math.max(1, Math.floor(options.maxBuckets ?? MAX_RATE_LIMIT_BUCKETS))
+  );
 
   return (req: Request, res: Response, next: NextFunction) => {
     const now = Date.now();
@@ -597,14 +602,14 @@ export function createRateLimiter(options: {
     const existing = buckets.get(clientIp);
 
     if (!existing || now >= existing.resetAt) {
-      if (buckets.size >= MAX_RATE_LIMIT_BUCKETS) {
+      if (buckets.size >= maxBuckets) {
         // Expired buckets may be reclaimed, but never evict a live client's
         // bucket: doing so lets an attacker rotate spoofed IPs to reset limits.
         for (const [key, bucket] of buckets) {
           if (now >= bucket.resetAt) buckets.delete(key);
         }
       }
-      if (buckets.size >= MAX_RATE_LIMIT_BUCKETS) {
+      if (buckets.size >= maxBuckets) {
         res.setHeader('X-RateLimit-Limit', String(options.maxRequests));
         res.setHeader('X-RateLimit-Remaining', '0');
         res.setHeader('Retry-After', String(Math.max(1, Math.ceil(options.windowMs / 1000))));
