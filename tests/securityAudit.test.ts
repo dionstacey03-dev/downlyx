@@ -332,4 +332,36 @@ describe('DOWNLYX Phase 2.1: Security Hardening & Audit Tests', () => {
       );
     }
   });
+
+  it('does not evict active rate-limit buckets when the cache is full', async () => {
+    const app = express();
+    app.set('trust proxy', false);
+    const limiter = createRateLimiter({
+      windowMs: 60_000,
+      maxRequests: 1,
+      trustProxy: true,
+      maxBuckets: 2,
+    });
+    app.get('/capacity-limit', limiter, (_req, res) => res.status(200).json({ ok: true }));
+
+    const server = http.createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const addr = server.address() as AddressInfo;
+    const url = `http://127.0.0.1:${addr.port}/capacity-limit`;
+    const requestFrom = (ip: string) =>
+      fetch(url, { headers: { 'X-Forwarded-For': ip } });
+
+    try {
+      assert.equal((await requestFrom('8.8.8.8')).status, 200);
+      assert.equal((await requestFrom('8.8.8.8')).status, 429);
+      assert.equal((await requestFrom('1.1.1.1')).status, 200);
+      assert.equal((await requestFrom('9.9.9.9')).status, 429);
+      // Existing bucket remains active; cache pressure must not reset its limit.
+      assert.equal((await requestFrom('8.8.8.8')).status, 429);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err ? reject(err) : resolve()))
+      );
+    }
+  });
 });
