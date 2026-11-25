@@ -9,7 +9,12 @@ import {
   getDocFromServer,
   getFirestore,
 } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
+import firebaseConfigJson from '../firebase-applet-config.json';
+
+const firebaseConfig = {
+  ...firebaseConfigJson,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfigJson.apiKey,
+};
 
 const app = initializeApp(firebaseConfig);
 
