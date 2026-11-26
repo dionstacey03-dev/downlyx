@@ -26,11 +26,14 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: package.json
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
 
       - name: Install integration-test tools
         run: |
@@ -39,10 +42,10 @@ jobs:
           npm install --global firebase-tools
 
       - name: Typecheck
-        run: npm run lint
+        run: bun run lint
 
       - name: Test
-        run: npm test
+        run: bun run test
 
       - name: Build
-        run: npm run build
+        run: bun run build
