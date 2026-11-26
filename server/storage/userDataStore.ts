@@ -8,6 +8,10 @@ interface StoredUserData {
   preferences?: UserPreferences;
 }
 
+// Test-only adapter keeps auth-emulator integration tests hermetic. Production
+// always uses Firestore; no in-memory fallback is permitted in deployed mode.
+const testData = new Map<string, StoredUserData>();
+
 function userDocument(uid: string) {
   if (!uid || uid.length > 256) throw new Error('Invalid user identifier.');
   const documentId = Buffer.from(uid, 'utf8').toString('base64url');
@@ -32,6 +36,7 @@ function readPreferences(data?: StoredUserData): UserPreferences {
 }
 
 export async function getUserHistory(uid: string): Promise<HistoryItem[]> {
+  if (process.env.NODE_ENV === 'test') return readHistory(testData.get(uid));
   const snapshot = await userDocument(uid).get();
   return readHistory(snapshot.data() as StoredUserData | undefined);
 }
@@ -40,6 +45,12 @@ export async function updateUserHistory<T>(
   uid: string,
   updater: (history: HistoryItem[]) => { history: HistoryItem[]; result: T }
 ): Promise<T> {
+  if (process.env.NODE_ENV === 'test') {
+    const current = testData.get(uid) ?? {};
+    const updated = updater(readHistory(current));
+    testData.set(uid, { ...current, history: updated.history.slice(0, 100) });
+    return updated.result;
+  }
   const ref = userDocument(uid);
   return getFirestore(getFirebaseAdminApp()).runTransaction(async (transaction) => {
     const snapshot = await transaction.get(ref);
@@ -55,6 +66,7 @@ export async function updateUserHistory<T>(
 }
 
 export async function getUserPreferences(uid: string): Promise<UserPreferences> {
+  if (process.env.NODE_ENV === 'test') return readPreferences(testData.get(uid));
   const snapshot = await userDocument(uid).get();
   return readPreferences(snapshot.data() as StoredUserData | undefined);
 }
@@ -63,6 +75,11 @@ export async function setUserPreferences(
   uid: string,
   preferences: UserPreferences
 ): Promise<void> {
+  if (process.env.NODE_ENV === 'test') {
+    const current = testData.get(uid) ?? {};
+    testData.set(uid, { ...current, preferences });
+    return;
+  }
   await userDocument(uid).set(
     { preferences: withoutUndefined(preferences) },
     { merge: true }
@@ -70,5 +87,9 @@ export async function setUserPreferences(
 }
 
 export async function deleteUserData(uid: string): Promise<void> {
+  if (process.env.NODE_ENV === 'test') {
+    testData.delete(uid);
+    return;
+  }
   await userDocument(uid).delete();
 }
