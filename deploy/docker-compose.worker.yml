@@ -32,31 +32,6 @@ services:
     tmpfs:
       - /tmp/downlyx-media-tmp:rw,noexec,nosuid,nodev,size=384m,mode=0700
 
-  # This image is a hardened standalone worker image, but it is NOT yet
-  # connected to the API's in-process MediaWorkerManager. Do not rely on it
-  # for API job execution until a queue/IPC adapter is implemented.
-  downlyx-media-worker:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile.worker
-    user: "1000:1000"
-    read_only: true
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    cpus: "1.0"
-    mem_limit: 512m
-    pids_limit: 64
-    tmpfs:
-      - /tmp/downlyx-media-tmp:rw,noexec,nosuid,nodev,size=256m,mode=0700
-    environment:
-      DOWNLYX_WORKER_MODE: "1"
-      NODE_ENV: production
-      TMPDIR: /tmp/downlyx-media-tmp
-    networks:
-      - downlyx-worker-egress
-
 networks:
   downlyx-app-net:
     driver: bridge
