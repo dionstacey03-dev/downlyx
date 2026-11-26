@@ -190,6 +190,7 @@ async function withPhase3ApiServer(
     tempDir: string;
     fileTtlMs?: number;
     maxConcurrentPerOwner?: number;
+    maxTotalStorageBytes?: number;
     customStreamOpener?: WorkerTestOverrides['customStreamOpener'];
   },
   fn: (baseUrl: string, manager: MediaWorkerManager) => Promise<void>
@@ -198,6 +199,7 @@ async function withPhase3ApiServer(
     tempDir: options.tempDir,
     fileTtlMs: options.fileTtlMs ?? 60_000,
     maxConcurrentPerOwner: options.maxConcurrentPerOwner ?? 3,
+    maxTotalStorageBytes: options.maxTotalStorageBytes,
     disableAutoSweeper: true,
     customExecutor: async (input, onEvent, signal) => {
       await executeWorkerJob(input, onEvent, signal, {
@@ -832,6 +834,7 @@ describe('DOWNLYX Phase 3: Secure Media Download Engine', () => {
         {
           tempDir,
           maxConcurrentPerOwner: 3,
+          maxTotalStorageBytes: 500 * 1024 * 1024,
           customStreamOpener: async () =>
             createMockIncomingMessage({
               statusCode: 200,
