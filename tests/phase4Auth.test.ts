@@ -12,7 +12,6 @@ import { initializeApp as initializeClientApp, deleteApp as deleteClientApp } fr
 import {
   connectAuthEmulator,
   createUserWithEmailAndPassword,
-  deleteUser,
   getAuth as getClientAuth,
   GoogleAuthProvider,
   sendEmailVerification,
@@ -433,8 +432,8 @@ describe('Phase 4: Firebase Authentication & User Isolation (Emulator Integratio
       assert.equal(delAccBody.deleted, true);
       assert.ok(delAccBody.purgedJobsCount >= 1);
 
-      // Delete Firebase Auth user as frontend does
-      await deleteUser(beforeDeleteLogin.user);
+      // The DELETE /api/account endpoint already deletes the Firebase Auth user.
+      // Calling client deleteUser() again uses a revoked/expired token and fails.
 
       // Deleted user token can no longer access backend endpoints
       const postDeleteMe = await fetch(`${baseUrl}/api/auth/me`, {
