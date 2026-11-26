@@ -1,6 +1,6 @@
 FROM oven/bun:1-alpine
 
-RUN apk add --no-cache ffmpeg   && addgroup -S downlyx   && adduser -S -G downlyx downlyx
+RUN apk add --no-cache ffmpeg util-linux   && addgroup -S downlyx   && adduser -S -G downlyx downlyx
 
 WORKDIR /app
 
