@@ -260,9 +260,24 @@ export async function revokeFirebaseUserRefreshTokens(
     const app = getFirebaseAdminApp();
     await getAuth(app).revokeRefreshTokens(uid);
   } catch (err) {
+    // In production, a successful logout/account deletion must not be reported
+    // unless Firebase has invalidated refresh tokens globally. Local in-memory
+    // revocation only protects this process and is not sufficient on replicas.
+    if (process.env.NODE_ENV === 'production') {
+      console.error(
+        'Firebase refresh-token revocation failed; refusing to confirm logout.',
+        isIamUnavailableError(err) ? 'admin-permission-or-credential-error' : 'admin-api-error'
+      );
+      throw new FirebaseTokenVerificationError(
+        'Session revocation could not be confirmed. Please retry.',
+        503,
+        'auth/revocation-unavailable'
+      );
+    }
+
     if (!isIamUnavailableError(err)) {
-      // Log non-IAM errors subtly without leaking credentials
-      console.warn('Unable to call Firebase Admin revokeRefreshTokens:', err instanceof Error ? err.message : 'unknown');
+      // Non-production diagnostic is deliberately generic to avoid leaking credentials.
+      console.warn('Unable to call Firebase Admin revokeRefreshTokens.');
     }
   }
 }
