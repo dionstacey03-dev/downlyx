@@ -162,9 +162,10 @@ async function waitCompleted(baseUrl: string, jobId: string, token: string): Pro
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = (await res.json()) as { job: DownloadJob };
-    if (data.job.status === 'completed' || data.job.status === 'failed') {
-      return data.job;
+    if (data.job.status === 'failed' || data.job.status === 'permanently_failed') {
+      throw new Error(`Download worker failed: ${data.job.error || 'no worker error reported'}`);
     }
+    if (data.job.status === 'completed') return data.job;
     await new Promise((r) => setTimeout(r, 35));
   }
   throw new Error('Timed out');
