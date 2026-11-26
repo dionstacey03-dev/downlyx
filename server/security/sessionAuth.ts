@@ -54,7 +54,7 @@ export interface WorkspaceSessionPayload {
 }
 
 export function issueWorkspaceSessionToken(
-  ownerId = crypto.randomUUID(),
+  ownerId: string = crypto.randomUUID(),
   ttlMs = 24 * 60 * 60 * 1000
 ): { token: string; ownerId: string; expiresAt: string } {
   if (typeof ownerId !== 'string' || ownerId.trim().length < 1 || ownerId.length > 128) {
