@@ -1,3 +1,4 @@
+import { apiUrl } from '../utils/api.ts';
 import React, { useMemo, useRef, useState } from 'react';
 import {
   ClipboardPaste,
@@ -194,7 +195,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     setAnalysis(null);
 
     try {
-      const response = await fetch('/api/analyze', {
+      const response = await fetch(apiUrl('/api/analyze'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: query }),
