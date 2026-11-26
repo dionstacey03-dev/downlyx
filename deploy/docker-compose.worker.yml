@@ -10,7 +10,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
-      TRUST_PROXY: "true"
+      TRUST_PROXY: "false"
       DOWNLYX_SESSION_SECRET: "${DOWNLYX_SESSION_SECRET:?Set a strong DOWNLYX_SESSION_SECRET}"
       FIREBASE_PROJECT_ID: "${FIREBASE_PROJECT_ID:-alien-truck-flvvl}"
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase_admin
