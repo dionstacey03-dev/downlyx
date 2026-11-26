@@ -157,10 +157,11 @@ export function createMediaRouter(options?: MediaRouterOptions) {
     async (req: FirebaseAuthRequest, res) => {
       const uid = req.authUser!.uid;
       const bearer = req.headers.authorization?.slice('Bearer '.length).trim();
+      let purgedJobsCount = 0;
       try {
         // Remove application data before deleting the Firebase identity so a
         // transient Auth Admin failure remains retryable by the signed-in user.
-        const purgedJobsCount = await workerManager.purgeJobsForOwner(uid);
+        purgedJobsCount = await workerManager.purgeJobsForOwner(uid);
         await deleteUserData(uid);
         await deleteFirebaseUserAccount(uid, { exactToken: bearer });
         res.status(200).json({ deleted: true, purgedJobsCount });
