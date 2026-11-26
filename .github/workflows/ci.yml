@@ -49,3 +49,6 @@ jobs:
 
       - name: Build
         run: bun run build
+
+      - name: Build API container
+        run: docker build --build-arg VITE_FIREBASE_API_KEY=ci-placeholder -t downlyx-api:ci .
