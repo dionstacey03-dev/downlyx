@@ -23,6 +23,10 @@ child processes inside the API container.
    it has only the required Firebase Auth permissions. Never commit it.
 4. Build and run with a container platform that supports read-only root files,
    tmpfs, CPU/memory/PID limits, and secret mounts.
+5. Keep `TRUST_PROXY=false` unless the API is reachable only through a trusted
+   reverse proxy/load balancer that overwrites forwarding headers. If deployed
+   behind such a proxy, configure the correct hop count rather than blindly
+   trusting client-supplied `X-Forwarded-For` headers.
 
 Example local build:
 
