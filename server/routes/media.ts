@@ -104,8 +104,17 @@ export function createMediaRouter(options?: MediaRouterOptions) {
     async (req: FirebaseAuthRequest, res) => {
       const uid = req.authUser!.uid;
       const bearer = req.headers.authorization?.slice('Bearer '.length).trim();
-      await revokeFirebaseUserRefreshTokens(uid, { exactToken: bearer });
-      res.status(200).json({ loggedOut: true });
+      try {
+        await revokeFirebaseUserRefreshTokens(uid, { exactToken: bearer });
+        res.status(200).json({ loggedOut: true });
+      } catch {
+        // Express 4 does not automatically forward rejected async route handlers.
+        res.status(503).json({
+          loggedOut: false,
+          error: 'Session revocation could not be confirmed. Please retry.',
+          code: 'auth/revocation-unavailable',
+        });
+      }
     }
   );
 
@@ -122,11 +131,21 @@ export function createMediaRouter(options?: MediaRouterOptions) {
         exactToken: bearer,
         accountDeleted: true,
       });
-      await revokeFirebaseUserRefreshTokens(uid, {
-        exactToken: bearer,
-        accountDeleted: true,
-      });
-      res.status(200).json({ deleted: true, purgedJobsCount });
+      try {
+        await revokeFirebaseUserRefreshTokens(uid, {
+          exactToken: bearer,
+          accountDeleted: true,
+        });
+        res.status(200).json({ deleted: true, purgedJobsCount });
+      } catch {
+        // Do not report deletion as complete until global token revocation succeeds.
+        res.status(503).json({
+          deleted: false,
+          purgedJobsCount,
+          error: 'Account session revocation could not be confirmed. Please retry.',
+          code: 'auth/revocation-unavailable',
+        });
+      }
     }
   );
 
