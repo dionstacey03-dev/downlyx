@@ -227,7 +227,16 @@ export class MediaWorkerManager {
     // Reclaim expired files before checking global temporary storage quota
     await this.cleanupExpiredFiles();
     const currentUsage = await getTempDirUsageBytes(this.tempDir);
-    if (currentUsage >= this.maxTotalStorageBytes) {
+    // Reserve worst-case input + output capacity for active jobs. Each job may
+    // temporarily hold both its downloaded source and transformed result.
+    const activeReservations = Array.from(this.jobs.entries()).reduce((total, [id, active]) => {
+      if (id === jobId) return total;
+      const status = active.job.status;
+      if (status !== 'queued' && status !== 'processing' && status !== 'verifying') return total;
+      return total + (active.workerInput.maxBytes ?? this.maxBytes) * 2;
+    }, 0);
+    const requestedReservation = (workerInput.maxBytes ?? this.maxBytes) * 2;
+    if (currentUsage + activeReservations + requestedReservation > this.maxTotalStorageBytes) {
       this.jobs.delete(jobId);
       return {
         ok: false,
