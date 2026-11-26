@@ -57,16 +57,9 @@ export interface FirestoreErrorInfo {
   operationType: OperationType;
   path: string | null;
   authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
-    tenantId?: string | null;
-    providerInfo?: {
-      providerId?: string | null;
-      email?: string | null;
-    }[];
+    authenticated: boolean;
   };
+  errorCode?: string;
 }
 
 export function handleFirestoreError(
@@ -74,22 +67,20 @@ export function handleFirestoreError(
   operationType: OperationType,
   path: string | null
 ): never {
+  const rawErrorCode =
+    typeof error === 'object' && error !== null && 'code' in error
+      ? String((error as { code?: unknown }).code)
+      : undefined;
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    // Do not include raw Firebase messages, account identifiers, email
+    // addresses, provider metadata, or user document IDs in client logs/errors.
+    error: 'Firestore operation failed.',
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo:
-        auth.currentUser?.providerData?.map((provider) => ({
-          providerId: provider.providerId,
-          email: provider.email,
-        })) || [],
+      authenticated: Boolean(auth.currentUser),
     },
     operationType,
-    path,
+    path: path ? path.replace(/users\\/[^/]+/g, 'users/[redacted]') : null,
+    ...(rawErrorCode ? { errorCode: rawErrorCode } : {}),
   };
   console.error('Firestore Error:', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
