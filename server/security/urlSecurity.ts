@@ -60,6 +60,7 @@ function isPrivateOrReservedIpv4Int(n: number): boolean {
   if (a === 172 && b >= 16 && b <= 31) return true; // Private 172.16.0.0/12
   if (a === 192 && b === 168) return true; // Private 192.168.0.0/16
   if (a === 192 && b === 0 && c === 0) return true; // 192.0.0.0/24
+  if (a === 192 && b === 88 && c === 99) return true; // 6to4 relay anycast
   if (a === 192 && b === 0 && c === 2) return true; // TEST-NET-1
   if (a === 198 && (b === 18 || b === 19)) return true; // Benchmarking 198.18.0.0/15
   if (a === 198 && b === 51 && c === 100) return true; // TEST-NET-2
@@ -158,8 +159,21 @@ export function isPrivateOrReservedIp(ip: string): boolean {
     // Documentation 2001:db8::/32
     if (g[0] === 0x2001 && g[1] === 0x0db8) return true;
 
-    // Teredo 2001::/32
-    if (g[0] === 0x2001 && g[1] === 0x0000) return true;
+    // Special-purpose IPv6 ranges and transition mechanisms can tunnel or
+    // translate traffic to non-public IPv4 destinations.
+    if (
+      g[0] === 0x2001 &&
+      (g[1] === 0x0000 || // Teredo
+        g[1] === 0x0002 || // Benchmarking
+        g[1] === 0x0010 || // ORCHID
+        g[1] === 0x0020) // ORCHIDv2
+    ) return true;
+    if (g[0] === 0x2002) return true; // 6to4
+
+    // Accept only IPv6 global-unicast space (2000::/3) after the explicit
+    // mapped/NAT64 cases above. This blocks site-local, protocol-assignment,
+    // and other non-global address ranges that are not safe Internet targets.
+    if (g[0] < 0x2000 || g[0] > 0x3fff) return true;
 
     return false;
   }
