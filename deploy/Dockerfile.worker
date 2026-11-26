@@ -1,17 +1,16 @@
-FROM node:22-alpine AS worker
+FROM oven/bun:1-alpine
 
-RUN apk add --no-cache ffmpeg util-linux \
-  && addgroup -S downlyx && adduser -S downlyx -G downlyx
+RUN apk add --no-cache ffmpeg util-linux   && addgroup -S downlyx   && adduser -S -G downlyx downlyx
 
 WORKDIR /app
 
-COPY package.json ./
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+
 COPY src ./src
 COPY server ./server
 
-RUN mkdir -p /tmp/downlyx-media-tmp \
-  && chown -R downlyx:downlyx /tmp/downlyx-media-tmp \
-  && chmod 0700 /tmp/downlyx-media-tmp
+RUN mkdir -p /tmp/downlyx-media-tmp   && chown -R downlyx:downlyx /app /tmp/downlyx-media-tmp   && chmod 0700 /tmp/downlyx-media-tmp
 
 USER downlyx
 
@@ -22,4 +21,4 @@ ENV TMPDIR=/tmp/downlyx-media-tmp
 # Container must be run with:
 #   --read-only --cap-drop=ALL --security-opt=no-new-privileges:true
 #   --network=downlyx-worker-egress --memory=512m --cpus=1.0 --pids-limit=64
-ENTRYPOINT ["node", "--max-old-space-size=256", "server/worker/workerProcess.ts"]
+ENTRYPOINT ["bun", "run", "server/worker/workerProcess.ts"]
