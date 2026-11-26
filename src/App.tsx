@@ -1,3 +1,4 @@
+import { apiUrl } from './utils/api.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   EmailAuthProvider,
@@ -298,13 +299,13 @@ export default function App() {
         const token = await getFreshIdToken();
         if (active && token) {
           const [jobsRes, histRes, prefRes] = await Promise.all([
-            fetch('/api/downloads', {
+            fetch(apiUrl('/api/downloads'), {
               headers: { Authorization: `Bearer ${token}` },
             }),
-            fetch('/api/history', {
+            fetch(apiUrl('/api/history'), {
               headers: { Authorization: `Bearer ${token}` },
             }),
-            fetch('/api/preferences', {
+            fetch(apiUrl('/api/preferences'), {
               headers: { Authorization: `Bearer ${token}` },
             }),
           ]);
@@ -384,7 +385,7 @@ export default function App() {
       const token = await getFreshIdToken();
       if (!token || cancelled) return;
       try {
-        const res = await fetch('/api/downloads', {
+        const res = await fetch(apiUrl('/api/downloads'), {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.status === 401) {
@@ -393,7 +394,7 @@ export default function App() {
             await handleUnauthorizedResponse();
             return;
           }
-          const retry = await fetch('/api/downloads', {
+          const retry = await fetch(apiUrl('/api/downloads'), {
             headers: { Authorization: `Bearer ${refreshed}` },
           });
           if (retry.status === 401) {
@@ -487,7 +488,7 @@ export default function App() {
   const handleSignOut = useCallback(async () => {
     const token = await getFreshIdToken();
     if (token) {
-      await fetch('/api/auth/logout', {
+      await fetch(apiUrl('/api/auth/logout'), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       }).catch(() => {});
@@ -554,7 +555,7 @@ export default function App() {
       }
 
       const submitWithToken = (bearer: string) =>
-        fetch('/api/downloads', {
+        fetch(apiUrl('/api/downloads'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -627,8 +628,7 @@ export default function App() {
       if (!token) return;
 
       try {
-        const res = await fetch(
-          `/api/downloads/${encodeURIComponent(jobId)}`,
+        const res = await fetch(apiUrl(`/api/downloads/${encodeURIComponent(jobId)}`),
           {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` },
@@ -669,8 +669,7 @@ export default function App() {
       try {
         let downloadToken = downloadJobs.find((j) => j.id === jobId)?.downloadToken;
         if (!downloadToken) {
-          const ticketRes = await fetch(
-            `/api/downloads/${encodeURIComponent(jobId)}/token`,
+          const ticketRes = await fetch(apiUrl(`/api/downloads/${encodeURIComponent(jobId)}/token`),
             {
               method: 'POST',
               headers: { Authorization: `Bearer ${idToken}` },
@@ -695,8 +694,7 @@ export default function App() {
           downloadToken = ticketData.downloadToken;
         }
 
-        const fileRes = await fetch(
-          `/api/downloads/${encodeURIComponent(jobId)}/file`,
+        const fileRes = await fetch(apiUrl(`/api/downloads/${encodeURIComponent(jobId)}/file`),
           {
             method: 'GET',
             headers: {
@@ -760,7 +758,7 @@ export default function App() {
       if (!token) return null;
 
       try {
-        const response = await fetch('/api/history', {
+        const response = await fetch(apiUrl('/api/history'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -796,12 +794,12 @@ export default function App() {
       const token = await getFreshIdToken();
       if (token) {
         if (target?.jobId) {
-          await fetch(`/api/downloads/${encodeURIComponent(target.jobId)}`, {
+          await fetch(apiUrl(`/api/downloads/${encodeURIComponent(target.jobId)}`), {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` },
           }).catch(() => {});
         }
-        await fetch(`/api/history/${encodeURIComponent(id)}`, {
+        await fetch(apiUrl(`/api/history/${encodeURIComponent(id)}`), {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },
         }).catch(() => {});
@@ -837,7 +835,7 @@ export default function App() {
 
       const token = await getFreshIdToken();
       if (token) {
-        await fetch('/api/history/batch-delete', {
+        await fetch(apiUrl('/api/history/batch-delete'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -849,7 +847,7 @@ export default function App() {
         if (jobIdSet.size > 0) {
           await Promise.allSettled(
             Array.from(jobIdSet).map((jid) =>
-              fetch(`/api/downloads/${encodeURIComponent(jid)}`, {
+              fetch(apiUrl(`/api/downloads/${encodeURIComponent(jid)}`), {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` },
               })
@@ -878,14 +876,14 @@ export default function App() {
       if (jobIds.length > 0) {
         await Promise.allSettled(
           jobIds.map((jid) =>
-            fetch(`/api/downloads/${encodeURIComponent(jid)}`, {
+            fetch(apiUrl(`/api/downloads/${encodeURIComponent(jid)}`), {
               method: 'DELETE',
               headers: { Authorization: `Bearer ${token}` },
             })
           )
         );
       }
-      await fetch('/api/history', {
+      await fetch(apiUrl('/api/history'), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       }).catch(() => {});
@@ -909,7 +907,7 @@ export default function App() {
 
       const token = await getFreshIdToken();
       if (token) {
-        await fetch('/api/preferences', {
+        await fetch(apiUrl('/api/preferences'), {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -973,7 +971,7 @@ export default function App() {
 
         const token = await getFreshIdToken();
         if (token) {
-          await fetch('/api/account', {
+          await fetch(apiUrl('/api/account'), {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` },
           });
