@@ -233,9 +233,9 @@ export class MediaWorkerManager {
       if (id === jobId) return total;
       const status = active.job.status;
       if (status !== 'queued' && status !== 'processing' && status !== 'verifying') return total;
-      return total + (active.workerInput.maxBytes ?? this.maxBytes) * 2;
+      return total + (active.workerInput.maxBytes ?? this.maxBytes);
     }, 0);
-    const requestedReservation = (workerInput.maxBytes ?? this.maxBytes) * 2;
+    const requestedReservation = workerInput.maxBytes ?? this.maxBytes;
     if (currentUsage + activeReservations + requestedReservation > this.maxTotalStorageBytes) {
       this.jobs.delete(jobId);
       return {
