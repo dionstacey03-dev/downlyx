@@ -1,16 +1,22 @@
-version: "3.9"
-
 services:
   downlyx-api:
     build:
       context: ..
+      dockerfile: Dockerfile
+      args:
+        VITE_FIREBASE_API_KEY: "${VITE_FIREBASE_API_KEY:?Set VITE_FIREBASE_API_KEY from Firebase project settings}"
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: production
       PORT: "3000"
       TRUST_PROXY: "true"
-      DOWNLYX_SESSION_SECRET: "${DOWNLYX_SESSION_SECRET}"
+      DOWNLYX_SESSION_SECRET: "${DOWNLYX_SESSION_SECRET:?Set a strong DOWNLYX_SESSION_SECRET}"
+      FIREBASE_PROJECT_ID: "${FIREBASE_PROJECT_ID:-alien-truck-flvvl}"
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase_admin
+      TMPDIR: /tmp/downlyx-media-tmp
+    secrets:
+      - firebase_admin
     networks:
       - downlyx-app-net
     read_only: true
@@ -18,7 +24,15 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    cpus: "1.5"
+    mem_limit: 1g
+    pids_limit: 128
+    tmpfs:
+      - /tmp/downlyx-media-tmp:rw,noexec,nosuid,nodev,size=384m,mode=0700
 
+  # This image is a hardened standalone worker image, but it is NOT yet
+  # connected to the API's in-process MediaWorkerManager. Do not rely on it
+  # for API job execution until a queue/IPC adapter is implemented.
   downlyx-media-worker:
     build:
       context: ..
@@ -37,7 +51,7 @@ services:
     environment:
       DOWNLYX_WORKER_MODE: "1"
       NODE_ENV: production
-    # Worker MUST attach only to dedicated egress-filtered network (never internal DB/VPC nets)
+      TMPDIR: /tmp/downlyx-media-tmp
     networks:
       - downlyx-worker-egress
 
@@ -47,5 +61,10 @@ networks:
   downlyx-worker-egress:
     driver: bridge
     driver_opts:
-      # Pair with iptables/nftables egress policy denying RFC1918 & 169.254.0.0/16
+      # This prevents bridge peer communication only; configure host firewall
+      # egress rules to deny private, loopback, link-local, and metadata ranges.
       com.docker.network.bridge.enable_icc: "false"
+
+secrets:
+  firebase_admin:
+    file: ../firebase-admin.json
