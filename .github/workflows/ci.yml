@@ -33,7 +33,7 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies without rewriting the committed lockfile
-        run: bun install --no-save
+        run: bun install --frozen-lockfile
 
       - name: Install integration-test tools
         run: |
