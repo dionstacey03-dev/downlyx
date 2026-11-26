@@ -1,12 +1,19 @@
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import { isFirebaseConfigured } from './firebase.ts';
+import { isApiBaseConfigured } from './utils/api.ts';
 import {ErrorBoundary} from './components/ErrorBoundary.tsx';
 import './index.css';
 
+const requiresApiOrigin =
+  import.meta.env.PROD &&
+  window.location.hostname.endsWith('vercel.app') &&
+  !isApiBaseConfigured;
+const needsConfiguration = !isFirebaseConfigured || requiresApiOrigin;
+
 createRoot(document.getElementById('root')!).render(
   <ErrorBoundary>
-    {isFirebaseConfigured ? (
+    {!needsConfiguration ? (
       <App />
     ) : (
       <main
@@ -26,26 +33,30 @@ createRoot(document.getElementById('root')!).render(
             DOWNLYX · CONFIGURATION REQUIRED
           </p>
           <h1 style={{ fontSize: 'clamp(2rem, 6vw, 3rem)', marginBottom: '12px' }}>
-            Firebase is not configured
+            Production configuration is incomplete
           </h1>
           <p style={{ lineHeight: 1.7, color: '#b8c5d8' }}>
-            The app is safely paused because its Firebase web API key is missing.
-            Authentication and user data cannot work until the project owner adds
-            the key. This is a deployment configuration issue, not a sign-in problem.
+            { !isFirebaseConfigured
+              ? 'The app is paused because the Firebase web API key is missing.'
+              : 'The app is paused because the Vercel frontend has no API origin configured.' }
+            Authentication and downloads cannot work until the deployment settings are complete.
           </p>
           <ol style={{ lineHeight: 1.9, color: '#d5deec', paddingLeft: '22px' }}>
-            <li>Open the Firebase console and select the DOWNLYX project.</li>
-            <li>Go to Project settings → General → Your apps and copy the Web API key.</li>
-            <li>
-              Add <code>VITE_FIREBASE_API_KEY</code> to the Vercel project’s
-              Production environment variables.
-            </li>
-            <li>Redeploy the production build.</li>
+            {!isFirebaseConfigured && <>
+              <li>Open Firebase Console → Project settings → General → Your apps and copy the Web API key.</li>
+              <li>Add <code>VITE_FIREBASE_API_KEY</code> to Vercel’s Production environment variables.</li>
+            </>}
+            {requiresApiOrigin && <>
+              <li>Deploy the Express API and FFmpeg runtime to a persistent container host.</li>
+              <li>Add <code>VITE_API_BASE_URL</code> to Vercel with the API origin (for example, <code>https://api.example.com</code>).</li>
+              <li>Configure the API’s <code>DOWNLYX_ALLOWED_ORIGINS</code> with this frontend’s exact origin.</li>
+            </>}
+            <li>Redeploy the production build.
           </ol>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
-            Do not put Firebase Admin credentials or service-account JSON in this
-            frontend variable. The web API key is a client identifier; restrict
-            it using Firebase/API key settings and authorized domains.
+            Never put Firebase Admin credentials or service-account JSON in a
+            VITE_ variable. Restrict the Firebase web API key using API-key
+            settings and authorized domains.
           </p>
         </section>
       </main>
