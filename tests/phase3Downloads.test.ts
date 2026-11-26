@@ -246,11 +246,10 @@ async function pollJobUntilDone(
     });
     assert.equal(res.status, 200);
     const data = (await res.json()) as { job: DownloadJob };
-    if (
-      data.job.status === 'completed' ||
-      data.job.status === 'failed' ||
-      data.job.status === 'cancelled'
-    ) {
+    if (data.job.status === 'failed' || data.job.status === 'permanently_failed') {
+      throw new Error(`Download worker failed: ${data.job.error || 'no worker error reported'}`);
+    }
+    if (data.job.status === 'completed' || data.job.status === 'cancelled') {
       return data.job;
     }
     await new Promise((r) => setTimeout(r, 40));
