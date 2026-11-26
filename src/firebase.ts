@@ -79,7 +79,7 @@ export function handleFirestoreError(
       authenticated: Boolean(auth.currentUser),
     },
     operationType,
-    path: path ? path.replace(/users\\/[^/]+/g, 'users/[redacted]') : null,
+    path: path ? path.replace(/users\/[^/]+/g, 'users/[redacted]') : null,
     ...(rawErrorCode ? { errorCode: rawErrorCode } : {}),
   };
   console.error('Firestore Error:', JSON.stringify(errInfo));
