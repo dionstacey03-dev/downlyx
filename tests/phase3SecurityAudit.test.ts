@@ -299,7 +299,7 @@ describe('DOWNLYX Phase 3.1: Production Security Audit Tests', () => {
       await withAuditServer(
         {
           tempDir: ensured,
-          maxTotalStorageBytes: sampleMp4Buffer.length * 2,
+          maxTotalStorageBytes: sampleMp4Buffer.length,
           maxBytes: sampleMp4Buffer.length,
         },
         async (baseUrl) => {
