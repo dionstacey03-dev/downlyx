@@ -43,7 +43,11 @@ export function createMediaRouter(options?: MediaRouterOptions) {
   const asyncHandler = (handler: express.RequestHandler): express.RequestHandler =>
     (req, res, next) => {
       try {
-        const result = handler(req, res, next);
+        const result = (handler as (
+          req: express.Request,
+          res: express.Response,
+          next: express.NextFunction
+        ) => unknown)(req, res, next);
         if (result && typeof (result as Promise<unknown>).then === 'function') {
           void Promise.resolve(result).catch(next);
         }
