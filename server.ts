@@ -17,6 +17,66 @@ async function createServer() {
   const isProd = process.env.NODE_ENV === 'production';
 
   app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : false);
+
+  // Explicit origin allowlist for a separately hosted Vite frontend.
+  // Same-origin requests work without configuring CORS.
+  const allowedOrigins = new Set(
+    (process.env.DOWNLYX_ALLOWED_ORIGINS || '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+      .map((origin) => {
+        try {
+          return new URL(origin).origin;
+        } catch {
+          return '';
+        }
+      })
+      .filter(Boolean)
+  );
+
+  app.use((req, res, next) => {
+    const origin = req.get('Origin');
+    if (origin) {
+      let normalizedOrigin: string;
+      try {
+        normalizedOrigin = new URL(origin).origin;
+      } catch {
+        res.status(403).json({ error: 'Origin is not allowed.' });
+        return;
+      }
+
+      let sameOrigin = false;
+      try {
+        sameOrigin =
+          normalizedOrigin === new URL(`${req.protocol}://${req.get('host')}`).origin;
+      } catch {
+        sameOrigin = false;
+      }
+
+      if (!sameOrigin && !allowedOrigins.has(normalizedOrigin)) {
+        res.status(403).json({ error: 'Origin is not allowed.' });
+        return;
+      }
+
+      res.setHeader('Access-Control-Allow-Origin', normalizedOrigin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+      res.setHeader('Access-Control-Max-Age', '600');
+
+      if (req.method === 'OPTIONS') {
+        res.status(204).end();
+        return;
+      }
+    } else if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+
+    next();
+  });
+
   app.use((_req, res, next) => {
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('X-Content-Type-Options', 'nosniff');
