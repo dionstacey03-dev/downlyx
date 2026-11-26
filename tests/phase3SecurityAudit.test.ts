@@ -113,12 +113,14 @@ async function withAuditServer(
     tempDir: string;
     sessionTtlMs?: number;
     maxTotalStorageBytes?: number;
+    maxBytes?: number;
   },
   fn: (baseUrl: string, manager: MediaWorkerManager) => Promise<void>
 ) {
   const manager = new MediaWorkerManager({
     tempDir: opts.tempDir,
     maxTotalStorageBytes: opts.maxTotalStorageBytes,
+    maxBytes: opts.maxBytes,
     disableAutoSweeper: true,
     customExecutor: async (input, onEvent, signal) => {
       await executeWorkerJob(input, onEvent, signal, {
@@ -295,7 +297,11 @@ describe('DOWNLYX Phase 3.1: Production Security Audit Tests', () => {
 
       // Disk quota enforcement test
       await withAuditServer(
-        { tempDir: ensured, maxTotalStorageBytes: sampleMp4Buffer.length },
+        {
+          tempDir: ensured,
+          maxTotalStorageBytes: sampleMp4Buffer.length * 2,
+          maxBytes: sampleMp4Buffer.length,
+        },
         async (baseUrl) => {
           const token = makeTestFirebaseToken('audit-quota');
 
