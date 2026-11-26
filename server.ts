@@ -62,7 +62,7 @@ async function createServer() {
       res.setHeader('Access-Control-Allow-Origin', normalizedOrigin);
       res.setHeader('Vary', 'Origin');
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+      res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Download-Token');
       res.setHeader('Access-Control-Max-Age', '600');
 
       if (req.method === 'OPTIONS') {
