@@ -467,7 +467,7 @@ export default function App() {
 
     const timer = setInterval(() => {
       void pollOnce();
-    }, 450);
+    }, 1500);
 
     return () => {
       cancelled = true;
