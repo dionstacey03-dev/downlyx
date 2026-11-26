@@ -51,7 +51,7 @@ createRoot(document.getElementById('root')!).render(
               <li>Add <code>VITE_API_BASE_URL</code> to Vercel with the API origin (for example, <code>https://api.example.com</code>).</li>
               <li>Configure the API’s <code>DOWNLYX_ALLOWED_ORIGINS</code> with this frontend’s exact origin.</li>
             </>}
-            <li>Redeploy the production build.
+            <li>Redeploy the production build.</li>
           </ol>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
             Never put Firebase Admin credentials or service-account JSON in a
