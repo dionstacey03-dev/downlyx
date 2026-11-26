@@ -170,5 +170,9 @@ export function loadFirebaseAppletConfig(): {
     path.resolve(process.cwd(), 'firebase-applet-config.json'),
     'utf8'
   );
-  return JSON.parse(raw);
+  const config = JSON.parse(raw) as ReturnType<typeof loadFirebaseAppletConfig>;
+  // Firebase client SDK requires a non-empty API key even when requests are
+  // routed to the Auth Emulator. Never use a production key for emulator tests.
+  config.apiKey = process.env.FIREBASE_TEST_API_KEY || config.apiKey || 'fake-api-key';
+  return config;
 }
