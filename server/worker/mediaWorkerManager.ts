@@ -381,7 +381,12 @@ export class MediaWorkerManager {
       DOWNLYX_WORKER_MODE: '1',
     };
 
-    const nodeArgs = ['--max-old-space-size=256', WORKER_SCRIPT_PATH];
+    // The production image runs the API under Bun. Bun's CLI needs the
+    // explicit "run" subcommand and does not use Node's V8 heap flag.
+    // Keep the Node invocation for local Node-based deployments.
+    const nodeArgs = process.versions.bun
+      ? ['run', WORKER_SCRIPT_PATH]
+      : ['--max-old-space-size=256', WORKER_SCRIPT_PATH];
     const spawnCmd = HAS_PRLIMIT ? 'prlimit' : process.execPath;
     const spawnArgs = HAS_PRLIMIT
       ? [
