@@ -37,6 +37,35 @@ export interface MediaRouterOptions {
 export function createMediaRouter(options?: MediaRouterOptions) {
   const router = express.Router();
 
+  // Express 4 does not forward rejected promises from async route handlers.
+  // Wrap route middleware centrally so unexpected async failures reach the
+  // API error handler instead of becoming unhandled rejections/hung requests.
+  const asyncHandler = (handler: express.RequestHandler): express.RequestHandler =>
+    (req, res, next) => {
+      try {
+        const result = handler(req, res, next);
+        if (result && typeof (result as Promise<unknown>).then === 'function') {
+          void Promise.resolve(result).catch(next);
+        }
+      } catch (error) {
+        next(error);
+      }
+    };
+
+  const routeMethods = ['get', 'post', 'put', 'patch', 'delete'] as const;
+  for (const method of routeMethods) {
+    const original = router[method].bind(router) as (...args: unknown[]) => express.Router;
+    (router as unknown as Record<string, (...args: unknown[]) => express.Router>)[method] =
+      (...args: unknown[]) => {
+        const wrapped = args.map((arg, index) =>
+          index > 0 && typeof arg === 'function'
+            ? asyncHandler(arg as express.RequestHandler)
+            : arg
+        );
+        return original(...wrapped);
+      };
+  }
+
   // Per-UID isolated stores (backup/sync alongside Firestore)
   const historyByUid = new Map<string, HistoryItem[]>();
   const preferencesByUid = new Map<string, UserPreferences>();
