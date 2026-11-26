@@ -6,7 +6,7 @@ import {
 } from '../storage/tempStorage.ts';
 
 export const DEFAULT_MAX_MEDIA_DURATION_SECONDS = 600; // 10 minutes max processing duration
-const DEFAULT_FFMPEG_AS_LIMIT_BYTES = 512 * 1024 * 1024; // 512 MB virtual address space
+const DEFAULT_FFMPEG_AS_LIMIT_BYTES = 1024 * 1024 * 1024; // 1 GB virtual address space
 const DEFAULT_FFMPEG_CPU_SECONDS = 60;
 
 const HAS_PRLIMIT = (() => {
