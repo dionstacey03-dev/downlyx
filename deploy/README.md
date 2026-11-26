@@ -6,9 +6,10 @@ The web UI is a Vite build. The API is the Express application in `server.ts`
 and is **not** a Vercel serverless function. The frontend accepts a separate API
 origin through `VITE_API_BASE_URL`; the backend allowlists cross-origin browser
 requests using `DOWNLYX_ALLOWED_ORIGINS`. The API owns an in-process
-`MediaWorkerManager` and launches local worker child processes. The standalone
-`downlyx-media-worker` Compose service is not connected to the API's job
-manager or queue; do not treat it as the worker executing API jobs.
+`MediaWorkerManager` and launches local worker child processes. The API's worker manager starts local child processes inside the API container.
+The separate worker image is a child-process runner that expects a job payload
+on stdin; without a queue/IPC adapter it cannot act as a standalone service.
+The Compose stack therefore does not start a no-op worker container.
 
 ## Build and run the API container
 
