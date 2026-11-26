@@ -50,4 +50,5 @@ createRoot(document.getElementById('root')!).render(
         </section>
       </main>
     )}
+  </ErrorBoundary>
 );
