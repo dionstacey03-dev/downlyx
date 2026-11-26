@@ -9,7 +9,9 @@ RUN bun install --frozen-lockfile
 
 COPY . .
 ARG VITE_FIREBASE_API_KEY
+ARG VITE_API_BASE_URL
 ENV VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN bun run build   && mkdir -p /tmp/downlyx-media-tmp   && chown -R downlyx:downlyx /app /tmp/downlyx-media-tmp
 
 USER downlyx
