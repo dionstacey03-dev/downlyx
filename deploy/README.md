@@ -21,12 +21,16 @@ child processes inside the API container.
 2. Set `VITE_FIREBASE_API_KEY` to the web API key from Firebase Project
    Settings → General → Your apps. This is a public client configuration value;
    restrict it with API-key and Firebase authorized-domain settings.
-3. Provide Firebase Admin Application Default Credentials. For local Compose,
+3. Set `FIREBASE_PROJECT_ID` explicitly and enable Firebase Authentication
+   and Cloud Firestore in that project. The API stores account history and
+   preferences in the `downlyxUserData` collection using Firebase Admin
+   transactions; server-side Admin access bypasses client Firestore rules.
+4. Provide Firebase Admin Application Default Credentials. For local Compose,
    create an untracked `firebase-admin.json` service-account file and ensure
-   it has only the required Firebase Auth permissions. Never commit it.
-4. Build and run with a container platform that supports read-only root files,
+   it has the required Auth and Firestore permissions. Never commit it.
+5. Build and run with a container platform that supports read-only root files,
    tmpfs, CPU/memory/PID limits, and secret mounts.
-5. Keep `TRUST_PROXY=false` unless the API is reachable only through a trusted
+6. Keep `TRUST_PROXY=false` unless the API is reachable only through a trusted
    reverse proxy/load balancer that overwrites forwarding headers. If deployed
    behind such a proxy, configure the correct hop count rather than blindly
    trusting client-supplied `X-Forwarded-For` headers.
@@ -52,11 +56,18 @@ credentials are absent.
 
 ## Important remaining production work
 
+User history and preferences are persisted in Firestore. Download job
+state, active queue reservations, and completed-file metadata are still held by
+the API process and local temporary storage. A process restart or horizontal
+scale-out can lose active job state; a durable queue/job database is still
+required for reliable multi-instance production processing.
+
 The current manager does not dispatch jobs to the standalone worker container.
-True network-isolated media processing requires a queue/IPC contract, a
-persistent job store, and a worker service that consumes jobs and returns
-results. Do not expose the API as production-ready for untrusted URLs until
-that architecture is implemented and its egress policy is enforced at runtime.
+True network-isolated media processing requires a queue/IPC contract, durable
+job state, and a worker service that consumes jobs and returns results. The
+current process-level worker limits do not provide a separate network namespace.
+Do not expose the API as production-ready for arbitrary untrusted URL processing
+until the queue/worker architecture and its egress policy are enforced at runtime.
 
 Vercel's static frontend deployment alone does not host the Express API or
 FFmpeg worker. Configure a separately hosted API origin and route frontend
