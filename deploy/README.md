@@ -3,7 +3,9 @@
 ## Current architecture
 
 The web UI is a Vite build. The API is the Express application in `server.ts`
-and is **not** a Vercel serverless function. The API owns an in-process
+and is **not** a Vercel serverless function. The frontend accepts a separate API
+origin through `VITE_API_BASE_URL`; the backend allowlists cross-origin browser
+requests using `DOWNLYX_ALLOWED_ORIGINS`. The API owns an in-process
 `MediaWorkerManager` and launches local worker child processes. The standalone
 `downlyx-media-worker` Compose service is not connected to the API's job
 manager or queue; do not treat it as the worker executing API jobs.
@@ -31,8 +33,17 @@ child processes inside the API container.
 Example local build:
 
 ```sh
-docker build --build-arg VITE_FIREBASE_API_KEY="$VITE_FIREBASE_API_KEY" -t downlyx-api .
+docker build \
+  --build-arg VITE_FIREBASE_API_KEY="$VITE_FIREBASE_API_KEY" \
+  --build-arg VITE_API_BASE_URL="$VITE_API_BASE_URL" \
+  -t downlyx-api .
 ```
+
+When the frontend and API are hosted separately, set the Vercel Production
+environment variable `VITE_API_BASE_URL` to the API origin (no trailing path),
+and set `DOWNLYX_ALLOWED_ORIGINS` on the API to the exact frontend origin,
+such as `https://your-app.vercel.app`. The API includes an explicit CORS
+allowlist; it intentionally rejects unconfigured browser origins.
 
 The Compose file expects the local untracked `firebase-admin.json` file and
 the session secret to be supplied. It intentionally fails fast when required
