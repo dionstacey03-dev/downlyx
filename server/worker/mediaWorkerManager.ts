@@ -416,7 +416,10 @@ export class MediaWorkerManager {
             child.kill('SIGTERM');
           }
           setTimeout(() => {
-            if (!child.killed && child.pid) {
+            // child.killed only records whether a signal was sent; it does
+            // not indicate process exit. Escalate unless the process actually
+            // exited so stubborn workers cannot survive cancellation.
+            if (child.exitCode === null && child.signalCode === null && child.pid) {
               try {
                 process.kill(-child.pid, 'SIGKILL');
               } catch {
