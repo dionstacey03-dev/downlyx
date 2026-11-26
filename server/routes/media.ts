@@ -13,7 +13,7 @@ import {
 } from '../integrations/providerIntegrations.ts';
 import {
   createFirebaseAuthMiddleware,
-  markUserSessionRevoked,
+  deleteFirebaseUserAccount,
   requireVerifiedEmail,
   revokeFirebaseUserRefreshTokens,
   type FirebaseAuthRequest,
@@ -160,23 +160,17 @@ export function createMediaRouter(options?: MediaRouterOptions) {
       const purgedJobsCount = await workerManager.purgeJobsForOwner(uid);
       historyByUid.delete(uid);
       preferencesByUid.delete(uid);
-      markUserSessionRevoked(uid, Date.now(), {
-        exactToken: bearer,
-        accountDeleted: true,
-      });
       try {
-        await revokeFirebaseUserRefreshTokens(uid, {
-          exactToken: bearer,
-          accountDeleted: true,
-        });
+        // Revoke sessions first, then delete the Firebase Auth user. Do not
+        // report account deletion until Firebase confirms the user is removed.
+        await deleteFirebaseUserAccount(uid, { exactToken: bearer });
         res.status(200).json({ deleted: true, purgedJobsCount });
       } catch {
-        // Do not report deletion as complete until global token revocation succeeds.
         res.status(503).json({
           deleted: false,
           purgedJobsCount,
-          error: 'Account session revocation could not be confirmed. Please retry.',
-          code: 'auth/revocation-unavailable',
+          error: 'Account deletion could not be confirmed. Please retry.',
+          code: 'auth/account-deletion-unavailable',
         });
       }
     }
