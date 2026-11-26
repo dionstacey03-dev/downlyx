@@ -84,6 +84,10 @@ describe('DOWNLYX Phase 2.1: Security Hardening & Audit Tests', () => {
       'fd12:3456:789a::1',
       '64:ff9b::10.0.0.1',
       '2001:db8::1',
+      '2001:2::1',
+      '2001:10::1',
+      '2001:20::1',
+      '2002::1',
       'ff02::1',
     ];
 
@@ -96,6 +100,8 @@ describe('DOWNLYX Phase 2.1: Security Hardening & Audit Tests', () => {
     }
 
     assert.equal(isPrivateOrReservedIp('2606:4700:4700::1111'), false);
+    assert.equal(isPrivateOrReservedIp('2002:7f00:1::'), true); // 6to4 loopback tunnel
+    assert.equal(isPrivateOrReservedIp('192.88.99.1'), true); // 6to4 relay anycast
   });
 
   it('refuses redirect chains, redirects to localhost, and redirects to cloud metadata', async () => {
