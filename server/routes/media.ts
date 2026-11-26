@@ -2,10 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import fs from 'fs';
 import type { HistoryItem, UserPreferences } from '../../src/types/media.ts';
-import {
-  DEFAULT_PREFERENCES,
-  normalizeQualityPreference,
-} from '../../src/utils/platformDetector.ts';
+import { normalizeQualityPreference } from '../../src/utils/platformDetector.ts';
 import {
   ALL_ELIGIBLE_DIRECT_FORMATS,
   checkProviderDownloadAuthorization,
@@ -22,6 +19,13 @@ import {
 import { createRateLimiter } from '../security/urlSecurity.ts';
 import { analyzeUrlIntelligence } from '../services/urlIntelligenceService.ts';
 import { MediaWorkerManager } from '../worker/mediaWorkerManager.ts';
+import {
+  deleteUserData,
+  getUserHistory,
+  getUserPreferences,
+  setUserPreferences,
+  updateUserHistory,
+} from '../storage/userDataStore.ts';
 
 export interface MediaRouterOptions {
   rateLimitMax?: number;
@@ -69,10 +73,6 @@ export function createMediaRouter(options?: MediaRouterOptions) {
         return original(...wrapped);
       };
   }
-
-  // Per-UID isolated stores (backup/sync alongside Firestore)
-  const historyByUid = new Map<string, HistoryItem[]>();
-  const preferencesByUid = new Map<string, UserPreferences>();
 
   const workerManager =
     options?.workerManager ??
@@ -162,8 +162,7 @@ export function createMediaRouter(options?: MediaRouterOptions) {
         // purge app data or report deletion until Firebase confirms removal.
         await deleteFirebaseUserAccount(uid, { exactToken: bearer });
         const purgedJobsCount = await workerManager.purgeJobsForOwner(uid);
-        historyByUid.delete(uid);
-        preferencesByUid.delete(uid);
+        await deleteUserData(uid);
         res.status(200).json({ deleted: true, purgedJobsCount });
       } catch {
         res.status(503).json({
@@ -266,7 +265,7 @@ export function createMediaRouter(options?: MediaRouterOptions) {
         return;
       }
 
-      const savedPrefs = preferencesByUid.get(ownerId);
+      const savedPrefs = await getUserPreferences(ownerId);
       const autoRetry =
         typeof req.body?.autoRetry === 'boolean'
           ? req.body.autoRetry
@@ -418,9 +417,9 @@ export function createMediaRouter(options?: MediaRouterOptions) {
     '/history',
     requireFirebaseAuth,
     enforceVerifiedEmail,
-    (req: FirebaseAuthRequest, res) => {
+    async (req: FirebaseAuthRequest, res) => {
       const uid = req.authUser!.uid;
-      res.json({ items: historyByUid.get(uid) ?? [] });
+      res.json({ items: await getUserHistory(uid) });
     }
   );
 
@@ -430,7 +429,7 @@ export function createMediaRouter(options?: MediaRouterOptions) {
     enforceVerifiedEmail,
     async (req: FirebaseAuthRequest, res) => {
       const uid = req.authUser!.uid;
-      const userPrefs = preferencesByUid.get(uid) ?? DEFAULT_PREFERENCES;
+      const userPrefs = await getUserPreferences(uid);
       const rawUrl = typeof req.body?.url === 'string' ? req.body.url : '';
       const qualityPreference =
         typeof req.body?.qualityPreference === 'string' &&
@@ -476,8 +475,10 @@ export function createMediaRouter(options?: MediaRouterOptions) {
           : analysis.payload.error || 'Unsupported or restricted source logged',
       };
 
-      const prev = historyByUid.get(uid) ?? [];
-      historyByUid.set(uid, [item, ...prev].slice(0, 100));
+      await updateUserHistory(uid, (prev) => ({
+        history: [item, ...prev].slice(0, 100),
+        result: undefined,
+      }));
       res.status(201).json({ item });
     }
   );
@@ -486,16 +487,17 @@ export function createMediaRouter(options?: MediaRouterOptions) {
     '/history/:id',
     requireFirebaseAuth,
     enforceVerifiedEmail,
-    (req: FirebaseAuthRequest, res) => {
+    async (req: FirebaseAuthRequest, res) => {
       const uid = req.authUser!.uid;
       const id = req.params.id;
-      const prev = historyByUid.get(uid) ?? [];
-      const next = prev.filter((item) => item.id !== id);
-      if (next.length === prev.length) {
+      const deleted = await updateUserHistory(uid, (prev) => {
+        const next = prev.filter((item) => item.id !== id);
+        return { history: next, result: next.length !== prev.length };
+      });
+      if (!deleted) {
         res.status(404).json({ error: 'Item not found' });
         return;
       }
-      historyByUid.set(uid, next);
       res.json({ deleted: true });
     }
   );
@@ -504,8 +506,11 @@ export function createMediaRouter(options?: MediaRouterOptions) {
     '/history',
     requireFirebaseAuth,
     enforceVerifiedEmail,
-    (req: FirebaseAuthRequest, res) => {
-      historyByUid.set(req.authUser!.uid, []);
+    async (req: FirebaseAuthRequest, res) => {
+      await updateUserHistory(req.authUser!.uid, () => ({
+        history: [],
+        result: undefined,
+      }));
       res.json({ cleared: true });
     }
   );
@@ -537,11 +542,11 @@ export function createMediaRouter(options?: MediaRouterOptions) {
       }
 
       const idSet = new Set(requestedIds);
-      const prev = historyByUid.get(uid) ?? [];
-      const removedItems = prev.filter((item) => idSet.has(item.id));
-      const remaining = prev.filter((item) => !idSet.has(item.id));
-
-      historyByUid.set(uid, remaining);
+      const removedItems = await updateUserHistory(uid, (prev) => {
+        const removed = prev.filter((item) => idSet.has(item.id));
+        const remaining = prev.filter((item) => !idSet.has(item.id));
+        return { history: remaining, result: removed };
+      });
 
       const jobIdsToCancel = Array.from(
         new Set(
@@ -569,9 +574,9 @@ export function createMediaRouter(options?: MediaRouterOptions) {
     '/preferences',
     requireFirebaseAuth,
     enforceVerifiedEmail,
-    (req: FirebaseAuthRequest, res) => {
+    async (req: FirebaseAuthRequest, res) => {
       const uid = req.authUser!.uid;
-      res.json({ preferences: preferencesByUid.get(uid) ?? DEFAULT_PREFERENCES });
+      res.json({ preferences: await getUserPreferences(uid) });
     }
   );
 
@@ -579,9 +584,9 @@ export function createMediaRouter(options?: MediaRouterOptions) {
     '/preferences',
     requireFirebaseAuth,
     enforceVerifiedEmail,
-    (req: FirebaseAuthRequest, res) => {
+    async (req: FirebaseAuthRequest, res) => {
       const uid = req.authUser!.uid;
-      const current = preferencesByUid.get(uid) ?? { ...DEFAULT_PREFERENCES };
+      const current = await getUserPreferences(uid);
       const body = req.body ?? {};
       const allowedFormats = new Set(['mp4', 'webm', 'mp3', 'm4a']);
 
@@ -611,7 +616,7 @@ export function createMediaRouter(options?: MediaRouterOptions) {
             : current.workspaceName,
       };
 
-      preferencesByUid.set(uid, updated);
+      await setUserPreferences(uid, updated);
       res.json({ preferences: updated });
     }
   );
