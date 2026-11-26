@@ -13,7 +13,7 @@ services:
       PORT: "3000"
       TRUST_PROXY: "false"
       DOWNLYX_SESSION_SECRET: "${DOWNLYX_SESSION_SECRET:?Set a strong DOWNLYX_SESSION_SECRET}"
-      FIREBASE_PROJECT_ID: "${FIREBASE_PROJECT_ID:-alien-truck-flvvl}"
+      FIREBASE_PROJECT_ID: "${FIREBASE_PROJECT_ID:?Set FIREBASE_PROJECT_ID from Firebase project settings}"
       DOWNLYX_ALLOWED_ORIGINS: "${DOWNLYX_ALLOWED_ORIGINS:-}"
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase_admin
       TMPDIR: /tmp/downlyx-media-tmp
