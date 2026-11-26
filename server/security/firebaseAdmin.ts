@@ -251,6 +251,35 @@ function classifyVerifyError(err: unknown): FirebaseTokenVerificationError {
   );
 }
 
+export async function deleteFirebaseUserAccount(
+  uid: string,
+  options?: { exactToken?: string }
+): Promise<void> {
+  await revokeFirebaseUserRefreshTokens(uid, {
+    exactToken: options?.exactToken,
+    accountDeleted: true,
+  });
+
+  try {
+    await getAuth(getFirebaseAdminApp()).deleteUser(uid);
+  } catch (err) {
+    const code =
+      typeof err === 'object' && err !== null && 'code' in err
+        ? String((err as { code?: unknown }).code)
+        : '';
+    if (code === 'auth/user-not-found') return;
+    console.error(
+      'Firebase account deletion failed:',
+      isIamUnavailableError(err) ? 'admin-permission-or-credential-error' : 'admin-api-error'
+    );
+    throw new FirebaseTokenVerificationError(
+      'Account deletion could not be confirmed. Please retry.',
+      503,
+      'auth/account-deletion-unavailable'
+    );
+  }
+}
+
 export async function revokeFirebaseUserRefreshTokens(
   uid: string,
   options?: { exactToken?: string; accountDeleted?: boolean }
