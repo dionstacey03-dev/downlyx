@@ -110,6 +110,41 @@ async function createServer() {
 
   app.use('/api', mediaRouter);
 
+  // Keep API failures in a consistent, sanitized JSON envelope. The original
+  // exception is logged by type only; request secrets and upstream URLs are
+  // never reflected to clients.
+  app.use(
+    '/api',
+    (
+      err: unknown,
+      _req: Request,
+      res: Response,
+      _next: NextFunction
+    ) => {
+      const candidate = err as { status?: unknown; statusCode?: unknown };
+      const rawStatus = candidate?.statusCode ?? candidate?.status;
+      const status =
+        typeof rawStatus === 'number' &&
+        Number.isInteger(rawStatus) &&
+        rawStatus >= 400 &&
+        rawStatus <= 599
+          ? rawStatus
+          : 500;
+      console.error(
+        'DOWNLYX API request failed:',
+        err instanceof Error ? err.name : 'UnknownError'
+      );
+      if (res.headersSent) {
+        res.destroy();
+        return;
+      }
+      res.status(status).json({
+        error: status >= 500 ? 'Internal server error.' : 'Request could not be processed.',
+        code: status >= 500 ? 'api/internal-error' : 'api/request-error',
+      });
+    }
+  );
+
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
