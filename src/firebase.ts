@@ -16,13 +16,17 @@ const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfigJson.apiKey,
 };
 
-if (!firebaseConfig.apiKey?.trim()) {
-  throw new Error(
-    'Missing Firebase client API key. Set VITE_FIREBASE_API_KEY in your local or deployment environment.'
-  );
-}
+// A missing public Firebase web API key should not crash the entire React
+// module graph before the user can see a useful setup message. The app root
+// checks this flag and renders a configuration screen instead of mounting Auth.
+export const isFirebaseConfigured = Boolean(firebaseConfig.apiKey?.trim());
 
-const app = initializeApp(firebaseConfig);
+const app = initializeApp({
+  ...firebaseConfig,
+  // Firebase SDK initialization requires a string. This placeholder is never
+  // used for Auth/Firestore operations because the app root blocks them.
+  apiKey: firebaseConfig.apiKey?.trim() || 'missing-firebase-api-key',
+});
 
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
@@ -99,6 +103,6 @@ async function testConnection() {
   }
 }
 
-if (!emulatorUrl) {
+if (!emulatorUrl && isFirebaseConfigured) {
   void testConnection();
 }
