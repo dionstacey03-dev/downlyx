@@ -157,13 +157,13 @@ export function createMediaRouter(options?: MediaRouterOptions) {
     async (req: FirebaseAuthRequest, res) => {
       const uid = req.authUser!.uid;
       const bearer = req.headers.authorization?.slice('Bearer '.length).trim();
-      const purgedJobsCount = await workerManager.purgeJobsForOwner(uid);
-      historyByUid.delete(uid);
-      preferencesByUid.delete(uid);
       try {
         // Revoke sessions first, then delete the Firebase Auth user. Do not
-        // report account deletion until Firebase confirms the user is removed.
+        // purge app data or report deletion until Firebase confirms removal.
         await deleteFirebaseUserAccount(uid, { exactToken: bearer });
+        const purgedJobsCount = await workerManager.purgeJobsForOwner(uid);
+        historyByUid.delete(uid);
+        preferencesByUid.delete(uid);
         res.status(200).json({ deleted: true, purgedJobsCount });
       } catch {
         res.status(503).json({
